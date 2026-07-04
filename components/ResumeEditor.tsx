@@ -1,87 +1,82 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { SAMPLE_REVIEW } from "@/lib/sampleReview";
 import {
-  DEFAULT_KEYWORD_RULES,
-  type KeywordRule,
-} from "@/components/PdfKeywordHighlighter";
+  CATEGORY_STYLES,
+  type ReviewAnnotation,
+  type ReviewResult,
+} from "@/types/review";
 
-const PdfKeywordHighlighter = dynamic(
-  () => import("@/components/PdfKeywordHighlighter"),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        style={{
-          minHeight: "calc(100vh - 32px)",
-          display: "grid",
-          placeItems: "center",
-          border: "1px dashed rgba(0,0,0,0.15)",
-          borderRadius: 24,
-          background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-          color: "#475569",
-        }}
-      >
-        Preparing the PDF highlighter…
-      </div>
-    ),
-  },
-);
+const PdfReviewViewer = dynamic(() => import("@/components/PdfReviewViewer"), {
+  ssr: false,
+  loading: () => (
+    <div
+      style={{
+        minHeight: "calc(100vh - 32px)",
+        display: "grid",
+        placeItems: "center",
+        border: "1px dashed rgba(0,0,0,0.15)",
+        borderRadius: 24,
+        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+        color: "#475569",
+      }}
+    >
+      Preparing the review viewer…
+    </div>
+  ),
+});
 
-const PRESET_COLORS: { color: string; borderColor: string }[] = [
-  {
-    color: "rgba(255, 230, 109, 0.72)",
-    borderColor: "rgba(181, 136, 0, 0.65)",
-  },
-  {
-    color: "rgba(255, 92, 92, 0.72)",
-    borderColor: "rgba(183, 28, 28, 0.75)",
-  },
-  {
-    color: "rgba(94, 234, 212, 0.72)",
-    borderColor: "rgba(15, 118, 110, 0.75)",
-  },
-  {
-    color: "rgba(147, 197, 253, 0.72)",
-    borderColor: "rgba(29, 78, 216, 0.75)",
-  },
-  {
-    color: "rgba(216, 180, 254, 0.72)",
-    borderColor: "rgba(126, 34, 206, 0.75)",
-  },
-];
+type ManualMark = {
+  id: string;
+  quote: string;
+};
 
-function nextPreset(index: number) {
-  return PRESET_COLORS[index % PRESET_COLORS.length];
+let markCounter = 0;
+
+function nextMarkId() {
+  markCounter += 1;
+  return `manual-${markCounter}`;
 }
+
+const LEGEND_CATEGORIES = ["error", "improve", "suggestion", "good"] as const;
 
 export default function ResumeEditor() {
   const [file, setFile] = useState<File | null>(null);
-  const [keywordRules, setKeywordRules] = useState<KeywordRule[]>(
-    DEFAULT_KEYWORD_RULES,
-  );
+  const [review, setReview] = useState<ReviewResult | null>(null);
+  const [manualMarks, setManualMarks] = useState<ManualMark[]>([]);
+  const [selectedAnnotation, setSelectedAnnotation] =
+    useState<ReviewAnnotation | null>(null);
 
-  const onUpload = (selected: File) => {
-    setFile(selected);
+  // Future integration point: replace this with a call to the review
+  // service (upload `file`, receive a ReviewResult) and setReview() it.
+  const loadSampleReview = () => {
+    setReview(SAMPLE_REVIEW);
   };
 
-  const updateRule = (index: number, patch: Partial<KeywordRule>) => {
-    setKeywordRules((rules) =>
-      rules.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)),
+  const annotations = useMemo<ReviewAnnotation[]>(() => {
+    const manual: ReviewAnnotation[] = manualMarks.map((mark) => ({
+      id: mark.id,
+      quote: mark.quote,
+      category: "custom",
+      message: undefined,
+    }));
+    return [...(review?.annotations ?? []), ...manual];
+  }, [review, manualMarks]);
+
+  const updateMark = (id: string, quote: string) => {
+    setManualMarks((marks) =>
+      marks.map((mark) => (mark.id === id ? { ...mark, quote } : mark)),
     );
   };
 
-  const removeRule = (index: number) => {
-    setKeywordRules((rules) => rules.filter((_, i) => i !== index));
+  const removeMark = (id: string) => {
+    setManualMarks((marks) => marks.filter((mark) => mark.id !== id));
   };
 
-  const addRule = () => {
-    const preset = nextPreset(keywordRules.length);
-    setKeywordRules((rules) => [
-      ...rules,
-      { term: "", color: preset.color, borderColor: preset.borderColor },
-    ]);
+  const addMark = () => {
+    setManualMarks((marks) => [...marks, { id: nextMarkId(), quote: "" }]);
   };
 
   return (
@@ -102,27 +97,146 @@ export default function ResumeEditor() {
           overflowY: "auto",
         }}
       >
-        <h1 style={{ marginTop: 0 }}>PDF Highlighter</h1>
+        <h1 style={{ marginTop: 0 }}>Resume Review</h1>
         <p style={{ color: "#475569", lineHeight: 1.5 }}>
-          Upload a PDF and edit the list below to control which exact words
-          or phrases (even full sentences) get highlighted.
+          Upload a resume PDF. Review annotations mark areas to fix or
+          improve, color-coded by severity; hover a highlight to read the
+          reviewer&apos;s note.
         </p>
         <input
           type="file"
           accept="application/pdf"
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) onUpload(f);
+            if (f) setFile(f);
           }}
         />
 
         <h2 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>
-          Keywords
+          Review
+        </h2>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            fontSize: 13,
+            color: "#475569",
+          }}
+        >
+          {LEGEND_CATEGORIES.map((category) => {
+            const style = CATEGORY_STYLES[category];
+            return (
+              <div
+                key={category}
+                style={{ display: "flex", alignItems: "center", gap: 8 }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 4,
+                    flexShrink: 0,
+                    background: style.color,
+                    border: `1px solid ${style.borderColor}`,
+                  }}
+                />
+                {style.label}
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={loadSampleReview}
+          style={{
+            marginTop: 12,
+            width: "100%",
+            border: "1px solid rgba(15, 23, 42, 0.15)",
+            borderRadius: 8,
+            background: "#0f172a",
+            color: "#f8fafc",
+            padding: "8px 10px",
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+        >
+          {review ? "Reload sample review" : "Run review (sample)"}
+        </button>
+        {review && (
+          <p style={{ fontSize: 12, color: "#64748b", marginTop: 8 }}>
+            {review.annotations.length} annotation
+            {review.annotations.length === 1 ? "" : "s"} loaded.
+          </p>
+        )}
+
+        {selectedAnnotation && (
+          <div
+            style={{
+              marginTop: 16,
+              border: `1px solid ${
+                CATEGORY_STYLES[selectedAnnotation.category].borderColor
+              }`,
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.8)",
+              padding: "10px 12px",
+              fontSize: 13,
+              color: "#334155",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 6,
+              }}
+            >
+              <strong>
+                {CATEGORY_STYLES[selectedAnnotation.category].label}
+              </strong>
+              <button
+                type="button"
+                onClick={() => setSelectedAnnotation(null)}
+                aria-label="Dismiss selection"
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#94a3b8",
+                  cursor: "pointer",
+                  fontSize: 16,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div
+              style={{
+                fontStyle: "italic",
+                color: "#64748b",
+                marginBottom: selectedAnnotation.message ? 6 : 0,
+                overflowWrap: "anywhere",
+              }}
+            >
+              “{selectedAnnotation.quote}”
+            </div>
+            {selectedAnnotation.message && (
+              <div style={{ lineHeight: 1.5 }}>
+                {selectedAnnotation.message}
+              </div>
+            )}
+          </div>
+        )}
+
+        <h2 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>
+          Manual marks
         </h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {keywordRules.map((rule, index) => (
+          {manualMarks.map((mark) => (
             <div
-              key={index}
+              key={mark.id}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -140,17 +254,15 @@ export default function ResumeEditor() {
                   height: 16,
                   borderRadius: 4,
                   flexShrink: 0,
-                  background: rule.color,
-                  border: `1px solid ${rule.borderColor}`,
+                  background: CATEGORY_STYLES.custom.color,
+                  border: `1px solid ${CATEGORY_STYLES.custom.borderColor}`,
                 }}
               />
               <input
                 type="text"
-                value={rule.term}
-                placeholder="keyword or sentence"
-                onChange={(e) =>
-                  updateRule(index, { term: e.target.value })
-                }
+                value={mark.quote}
+                placeholder="word or sentence"
+                onChange={(e) => updateMark(mark.id, e.target.value)}
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -162,8 +274,8 @@ export default function ResumeEditor() {
               />
               <button
                 type="button"
-                onClick={() => removeRule(index)}
-                aria-label={`Remove ${rule.term || "keyword"}`}
+                onClick={() => removeMark(mark.id)}
+                aria-label={`Remove ${mark.quote || "mark"}`}
                 style={{
                   border: "none",
                   background: "transparent",
@@ -181,7 +293,7 @@ export default function ResumeEditor() {
         </div>
         <button
           type="button"
-          onClick={addRule}
+          onClick={addMark}
           style={{
             marginTop: 10,
             width: "100%",
@@ -194,12 +306,17 @@ export default function ResumeEditor() {
             fontSize: 13,
           }}
         >
-          + Add keyword
+          + Add mark
         </button>
       </aside>
 
       <main style={{ padding: 16 }}>
-        <PdfKeywordHighlighter file={file} keywordRules={keywordRules} />
+        <PdfReviewViewer
+          file={file}
+          annotations={annotations}
+          selectedAnnotationId={selectedAnnotation?.id ?? null}
+          onAnnotationClick={setSelectedAnnotation}
+        />
       </main>
     </div>
   );

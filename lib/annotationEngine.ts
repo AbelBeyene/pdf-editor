@@ -14,6 +14,12 @@ export type PositionedAnnotation = Highlight & {
 };
 
 const PAGE_SCALE = 1.4;
+/** Text runs are baseline-anchored and `height` only covers the ascent, so
+ * extend the box below the baseline to also cover descenders (g, y, p). */
+const DESCENDER_RATIO = 0.22;
+/** Horizontal padding added to each side of the box, as a fraction of the
+ * line height, so the marking doesn't hug the glyph edges. */
+const SIDE_PAD_RATIO = 0.12;
 
 type RawTextItem = {
   str: string;
@@ -171,8 +177,9 @@ function buildEntryRect(
     transform[4],
     transform[5],
   );
-  const viewportHeight = Math.max(height * PAGE_SCALE, 4);
-  const top = topAnchor - viewportHeight;
+  const ascentHeight = Math.max(height * PAGE_SCALE, 4);
+  const viewportHeight = ascentHeight * (1 + DESCENDER_RATIO);
+  const top = topAnchor - ascentHeight;
 
   const isFullItem = localStart <= 0 && localEnd >= str.length;
 
@@ -193,10 +200,11 @@ function buildEntryRect(
     widthPdf = measured.width;
   }
 
+  const sidePad = ascentHeight * SIDE_PAD_RATIO;
   const viewportRect = {
-    left: left + offsetPdf * PAGE_SCALE,
+    left: left + offsetPdf * PAGE_SCALE - sidePad,
     top,
-    width: Math.max(widthPdf * PAGE_SCALE, 4),
+    width: Math.max(widthPdf * PAGE_SCALE, 4) + sidePad * 2,
     height: viewportHeight,
     pageNumber,
   };
