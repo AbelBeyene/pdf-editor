@@ -237,6 +237,107 @@ function unionRects(rects: ScaledRect[]): ScaledRect {
   };
 }
 
+/** One matched text segment in PDF user-space coordinates (origin at the
+ * page's bottom-left, y up), as used by pdf-lib for editing. */
+export type PdfTextSegment = {
+  pageNumber: number; // 1-based
+  x: number;
+  baselineY: number;
+  width: number;
+  height: number; // ascent above the baseline
+  fontSize: number;
+  /** pdf.js internal font resource id (key into page.commonObjs). */
+  fontName: string;
+  /** CSS generic family pdf.js inferred ("serif" | "sans-serif" | "monospace"). */
+  fontFamily: string;
+};
+
+export type PdfTextMatch = {
+  text: string;
+  segments: PdfTextSegment[];
+};
+
+/**
+ * Finds every occurrence of `quote` in the document and returns its
+ * geometry in PDF user-space, one segment per underlying text run
+ * (a match wrapping across lines yields multiple segments).
+ */
+export async function findTextInPdf(
+  pdfDocument: PDFDocumentProxy,
+  quote: string,
+): Promise<PdfTextMatch[]> {
+  const matches: PdfTextMatch[] = [];
+  if (!quote.trim()) return matches;
+
+  const regex = buildQuoteMatcher(quote);
+
+  for (
+    let pageNumber = 1;
+    pageNumber <= pdfDocument.numPages;
+    pageNumber += 1
+  ) {
+    const page = await pdfDocument.getPage(pageNumber);
+    const textContent = await page.getTextContent();
+    const { pageText, entries } = buildPageText(
+      textContent.items as RawTextItem[],
+    );
+
+    regex.lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(pageText))) {
+      const start = match.index;
+      const end = start + match[0].length;
+      const segments: PdfTextSegment[] = [];
+
+      for (const entry of entries) {
+        if (entry.start >= end || entry.end <= start) continue;
+
+        const { str, transform, width, height, fontName } = entry.item;
+        const localStart = Math.max(start - entry.start, 0);
+        const localEnd = Math.min(end - entry.start, str.length);
+        const isFullItem = localStart <= 0 && localEnd >= str.length;
+
+        let offsetPdf = 0;
+        let widthPdf = width;
+
+        if (!isFullItem) {
+          const fontFamily =
+            textContent.styles[fontName]?.fontFamily ?? "sans-serif";
+          const measured = measureTokenOffset(
+            str,
+            { start: localStart, end: localEnd },
+            fontFamily,
+            transform,
+            width,
+          );
+          if (!measured) continue;
+          offsetPdf = measured.offset;
+          widthPdf = measured.width;
+        }
+
+        segments.push({
+          pageNumber,
+          x: transform[4] + offsetPdf,
+          baselineY: transform[5],
+          width: widthPdf,
+          height,
+          fontSize: getItemFontSize(transform),
+          fontName,
+          fontFamily:
+            textContent.styles[fontName]?.fontFamily ?? "sans-serif",
+        });
+      }
+
+      if (segments.length > 0) {
+        matches.push({ text: match[0], segments });
+      }
+    }
+  }
+
+  return matches;
+}
+
 export async function buildAnnotationHighlights(
   pdfDocument: PDFDocumentProxy,
   annotations: ReviewAnnotation[],

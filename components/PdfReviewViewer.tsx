@@ -93,13 +93,19 @@ function PdfDocumentAnnotator({
   annotations,
   selectedAnnotationId,
   onAnnotationClick,
+  onDocumentLoad,
 }: {
   pdfDocument: PDFDocumentProxy;
   annotations: ReviewAnnotation[];
   selectedAnnotationId: string | null;
   onAnnotationClick?: (annotation: ReviewAnnotation) => void;
+  onDocumentLoad?: (pdfDocument: PDFDocumentProxy | null) => void;
 }) {
   const [highlights, setHighlights] = useState<PositionedAnnotation[]>([]);
+
+  useEffect(() => {
+    onDocumentLoad?.(pdfDocument);
+  }, [pdfDocument, onDocumentLoad]);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,11 +152,15 @@ export default function PdfReviewViewer({
   annotations,
   selectedAnnotationId = null,
   onAnnotationClick,
+  onDocumentLoad,
 }: {
   file: File | null;
   annotations: ReviewAnnotation[];
   selectedAnnotationId?: string | null;
   onAnnotationClick?: (annotation: ReviewAnnotation) => void;
+  /** Called with the parsed pdf.js document once loaded (and with null when
+   * the file is cleared) — used by find & replace. */
+  onDocumentLoad?: (pdfDocument: PDFDocumentProxy | null) => void;
 }) {
   const fileUrl = useMemo(
     () => (file ? URL.createObjectURL(file) : null),
@@ -162,6 +172,10 @@ export default function PdfReviewViewer({
       if (fileUrl) URL.revokeObjectURL(fileUrl);
     };
   }, [fileUrl]);
+
+  useEffect(() => {
+    if (!fileUrl) onDocumentLoad?.(null);
+  }, [fileUrl, onDocumentLoad]);
 
   if (!fileUrl) {
     return (
@@ -196,6 +210,7 @@ export default function PdfReviewViewer({
           annotations={annotations}
           selectedAnnotationId={selectedAnnotationId}
           onAnnotationClick={onAnnotationClick}
+          onDocumentLoad={onDocumentLoad}
         />
       )}
     </PdfLoader>

@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import type { PDFDocumentProxy } from "react-pdf-highlighter-extended/node_modules/pdfjs-dist";
 import { CATEGORY_STYLES, type ReviewAnnotation } from "@/types/review";
 
 const PdfReviewViewer = dynamic(() => import("@/components/PdfReviewViewer"), {
@@ -53,6 +54,65 @@ export default function ResumeEditor() {
   const [manualMarks, setManualMarks] = useState<ManualMark[]>([]);
   const [selectedAnnotation, setSelectedAnnotation] =
     useState<ReviewAnnotation | null>(null);
+  const [findText, setFindText] = useState("");
+  const [replaceText, setReplaceText] = useState("");
+  const [replaceStatus, setReplaceStatus] = useState<string | null>(null);
+  const [replacing, setReplacing] = useState(false);
+  const pdfDocumentRef = useRef<PDFDocumentProxy | null>(null);
+
+  const handleDocumentLoad = useCallback(
+    (pdfDocument: PDFDocumentProxy | null) => {
+      pdfDocumentRef.current = pdfDocument;
+    },
+    [],
+  );
+
+  const runReplace = async () => {
+    const pdfDocument = pdfDocumentRef.current;
+    if (!file || !pdfDocument || !findText.trim()) return;
+
+    setReplacing(true);
+    setReplaceStatus(null);
+    try {
+      const { replaceTextInPdf } = await import("@/lib/pdfReplace");
+      const originalBytes = await file.arrayBuffer();
+      const { bytes, replacedCount } = await replaceTextInPdf(
+        originalBytes,
+        pdfDocument,
+        findText,
+        replaceText,
+      );
+
+      if (replacedCount === 0) {
+        setReplaceStatus("No matches found.");
+        return;
+      }
+
+      const nextFile = new File([bytes as BlobPart], file.name, {
+        type: "application/pdf",
+      });
+      setFile(nextFile);
+      setReplaceStatus(
+        `Replaced ${replacedCount} occurrence${replacedCount === 1 ? "" : "s"}.`,
+      );
+    } catch (error) {
+      setReplaceStatus(
+        error instanceof Error ? error.message : "Replace failed.",
+      );
+    } finally {
+      setReplacing(false);
+    }
+  };
+
+  const downloadPdf = () => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = file.name.replace(/\.pdf$/i, "") + "-edited.pdf";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   const annotations = useMemo<ReviewAnnotation[]>(
     () =>
@@ -298,6 +358,81 @@ export default function ResumeEditor() {
         >
           + Add mark
         </button>
+
+        <h2 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>
+          Find &amp; replace
+        </h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <input
+            type="text"
+            value={findText}
+            placeholder="find word or sentence"
+            onChange={(e) => setFindText(e.target.value)}
+            style={{
+              border: "1px solid rgba(15, 23, 42, 0.12)",
+              borderRadius: 6,
+              padding: "4px 6px",
+              fontSize: 13,
+            }}
+          />
+          <input
+            type="text"
+            value={replaceText}
+            placeholder="replace with"
+            onChange={(e) => setReplaceText(e.target.value)}
+            style={{
+              border: "1px solid rgba(15, 23, 42, 0.12)",
+              borderRadius: 6,
+              padding: "4px 6px",
+              fontSize: 13,
+            }}
+          />
+          <button
+            type="button"
+            onClick={runReplace}
+            disabled={!file || !findText.trim() || replacing}
+            style={{
+              border: "1px solid rgba(15, 23, 42, 0.15)",
+              borderRadius: 8,
+              background: "#0f172a",
+              color: "#f8fafc",
+              padding: "8px 10px",
+              cursor: !file || !findText.trim() || replacing
+                ? "not-allowed"
+                : "pointer",
+              opacity: !file || !findText.trim() || replacing ? 0.5 : 1,
+              fontSize: 13,
+            }}
+          >
+            {replacing ? "Replacing…" : "Replace in PDF"}
+          </button>
+          <button
+            type="button"
+            onClick={downloadPdf}
+            disabled={!file}
+            style={{
+              border: "1px solid rgba(15, 23, 42, 0.2)",
+              borderRadius: 8,
+              background: "transparent",
+              color: "#475569",
+              padding: "6px 8px",
+              cursor: file ? "pointer" : "not-allowed",
+              opacity: file ? 1 : 0.5,
+              fontSize: 13,
+            }}
+          >
+            Download PDF
+          </button>
+          {replaceStatus && (
+            <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>
+              {replaceStatus}
+            </p>
+          )}
+          <p style={{ fontSize: 11, color: "#94a3b8", margin: 0 }}>
+            Replacement covers the original text and redraws on top — long
+            replacements won&apos;t reflow the surrounding line.
+          </p>
+        </div>
       </aside>
 
       <main style={{ padding: 16 }}>
@@ -306,6 +441,7 @@ export default function ResumeEditor() {
           annotations={annotations}
           selectedAnnotationId={selectedAnnotation?.id ?? null}
           onAnnotationClick={setSelectedAnnotation}
+          onDocumentLoad={handleDocumentLoad}
         />
       </main>
     </div>
