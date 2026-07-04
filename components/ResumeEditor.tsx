@@ -2,12 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
-import { SAMPLE_REVIEW } from "@/lib/sampleReview";
-import {
-  CATEGORY_STYLES,
-  type ReviewAnnotation,
-  type ReviewResult,
-} from "@/types/review";
+import { CATEGORY_STYLES, type ReviewAnnotation } from "@/types/review";
 
 const PdfReviewViewer = dynamic(() => import("@/components/PdfReviewViewer"), {
   ssr: false,
@@ -31,6 +26,8 @@ const PdfReviewViewer = dynamic(() => import("@/components/PdfReviewViewer"), {
 type ManualMark = {
   id: string;
   quote: string;
+  color: string; // hex, from the color picker
+  message: string;
 };
 
 let markCounter = 0;
@@ -40,34 +37,38 @@ function nextMarkId() {
   return `manual-${markCounter}`;
 }
 
-const LEGEND_CATEGORIES = ["error", "improve", "suggestion", "good"] as const;
+const MARK_COLOR_CYCLE = ["#ffd54d", "#ff5c5c", "#4dabf7", "#51cf66", "#cc5de8"];
+
+function hexToRgba(hex: string, alpha: number) {
+  const value = hex.replace("#", "");
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 export default function ResumeEditor() {
   const [file, setFile] = useState<File | null>(null);
-  const [review, setReview] = useState<ReviewResult | null>(null);
   const [manualMarks, setManualMarks] = useState<ManualMark[]>([]);
   const [selectedAnnotation, setSelectedAnnotation] =
     useState<ReviewAnnotation | null>(null);
 
-  // Future integration point: replace this with a call to the review
-  // service (upload `file`, receive a ReviewResult) and setReview() it.
-  const loadSampleReview = () => {
-    setReview(SAMPLE_REVIEW);
-  };
+  const annotations = useMemo<ReviewAnnotation[]>(
+    () =>
+      manualMarks.map((mark) => ({
+        id: mark.id,
+        quote: mark.quote,
+        category: "custom",
+        message: mark.message || undefined,
+        color: hexToRgba(mark.color, 0.5),
+        borderColor: hexToRgba(mark.color, 0.9),
+      })),
+    [manualMarks],
+  );
 
-  const annotations = useMemo<ReviewAnnotation[]>(() => {
-    const manual: ReviewAnnotation[] = manualMarks.map((mark) => ({
-      id: mark.id,
-      quote: mark.quote,
-      category: "custom",
-      message: undefined,
-    }));
-    return [...(review?.annotations ?? []), ...manual];
-  }, [review, manualMarks]);
-
-  const updateMark = (id: string, quote: string) => {
+  const updateMark = (id: string, patch: Partial<ManualMark>) => {
     setManualMarks((marks) =>
-      marks.map((mark) => (mark.id === id ? { ...mark, quote } : mark)),
+      marks.map((mark) => (mark.id === id ? { ...mark, ...patch } : mark)),
     );
   };
 
@@ -76,7 +77,15 @@ export default function ResumeEditor() {
   };
 
   const addMark = () => {
-    setManualMarks((marks) => [...marks, { id: nextMarkId(), quote: "" }]);
+    setManualMarks((marks) => [
+      ...marks,
+      {
+        id: nextMarkId(),
+        quote: "",
+        color: MARK_COLOR_CYCLE[marks.length % MARK_COLOR_CYCLE.length],
+        message: "",
+      },
+    ]);
   };
 
   return (
@@ -99,9 +108,9 @@ export default function ResumeEditor() {
       >
         <h1 style={{ marginTop: 0 }}>Resume Review</h1>
         <p style={{ color: "#475569", lineHeight: 1.5 }}>
-          Upload a resume PDF. Review annotations mark areas to fix or
-          improve, color-coded by severity; hover a highlight to read the
-          reviewer&apos;s note.
+          Upload a resume PDF, then add marks below: pick a color, enter the
+          word or sentence to highlight, and optionally a note shown when
+          hovering or clicking the highlight.
         </p>
         <input
           type="file"
@@ -112,70 +121,12 @@ export default function ResumeEditor() {
           }}
         />
 
-        <h2 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>
-          Review
-        </h2>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-            fontSize: 13,
-            color: "#475569",
-          }}
-        >
-          {LEGEND_CATEGORIES.map((category) => {
-            const style = CATEGORY_STYLES[category];
-            return (
-              <div
-                key={category}
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <span
-                  aria-hidden
-                  style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: 4,
-                    flexShrink: 0,
-                    background: style.color,
-                    border: `1px solid ${style.borderColor}`,
-                  }}
-                />
-                {style.label}
-              </div>
-            );
-          })}
-        </div>
-        <button
-          type="button"
-          onClick={loadSampleReview}
-          style={{
-            marginTop: 12,
-            width: "100%",
-            border: "1px solid rgba(15, 23, 42, 0.15)",
-            borderRadius: 8,
-            background: "#0f172a",
-            color: "#f8fafc",
-            padding: "8px 10px",
-            cursor: "pointer",
-            fontSize: 13,
-          }}
-        >
-          {review ? "Reload sample review" : "Run review (sample)"}
-        </button>
-        {review && (
-          <p style={{ fontSize: 12, color: "#64748b", marginTop: 8 }}>
-            {review.annotations.length} annotation
-            {review.annotations.length === 1 ? "" : "s"} loaded.
-          </p>
-        )}
-
         {selectedAnnotation && (
           <div
             style={{
               marginTop: 16,
               border: `1px solid ${
+                selectedAnnotation.borderColor ??
                 CATEGORY_STYLES[selectedAnnotation.category].borderColor
               }`,
               borderRadius: 10,
@@ -230,64 +181,81 @@ export default function ResumeEditor() {
           </div>
         )}
 
-        <h2 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>
-          Manual marks
-        </h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <h2 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>Marks</h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {manualMarks.map((mark) => (
             <div
               key={mark.id}
               style={{
                 display: "flex",
-                alignItems: "center",
+                flexDirection: "column",
                 gap: 6,
                 background: "rgba(255,255,255,0.6)",
                 border: "1px solid rgba(15, 23, 42, 0.08)",
                 borderRadius: 8,
-                padding: "6px 8px",
+                padding: "8px",
               }}
             >
-              <span
-                aria-hidden
-                style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: 4,
-                  flexShrink: 0,
-                  background: CATEGORY_STYLES.custom.color,
-                  border: `1px solid ${CATEGORY_STYLES.custom.borderColor}`,
-                }}
-              />
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="color"
+                  value={mark.color}
+                  onChange={(e) => updateMark(mark.id, { color: e.target.value })}
+                  aria-label="Highlight color"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    flexShrink: 0,
+                    border: "none",
+                    background: "transparent",
+                    padding: 0,
+                    cursor: "pointer",
+                  }}
+                />
+                <input
+                  type="text"
+                  value={mark.quote}
+                  placeholder="word or sentence"
+                  onChange={(e) => updateMark(mark.id, { quote: e.target.value })}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    border: "1px solid rgba(15, 23, 42, 0.12)",
+                    borderRadius: 6,
+                    padding: "4px 6px",
+                    fontSize: 13,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeMark(mark.id)}
+                  aria-label={`Remove ${mark.quote || "mark"}`}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#94a3b8",
+                    cursor: "pointer",
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: "0 4px",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
               <input
                 type="text"
-                value={mark.quote}
-                placeholder="word or sentence"
-                onChange={(e) => updateMark(mark.id, e.target.value)}
+                value={mark.message}
+                placeholder="tooltip note (optional)"
+                onChange={(e) => updateMark(mark.id, { message: e.target.value })}
                 style={{
-                  flex: 1,
-                  minWidth: 0,
                   border: "1px solid rgba(15, 23, 42, 0.12)",
                   borderRadius: 6,
                   padding: "4px 6px",
-                  fontSize: 13,
+                  fontSize: 12,
+                  color: "#475569",
                 }}
               />
-              <button
-                type="button"
-                onClick={() => removeMark(mark.id)}
-                aria-label={`Remove ${mark.quote || "mark"}`}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "#94a3b8",
-                  cursor: "pointer",
-                  fontSize: 16,
-                  lineHeight: 1,
-                  padding: "0 4px",
-                }}
-              >
-                ×
-              </button>
             </div>
           ))}
         </div>
