@@ -22,6 +22,10 @@ export type ReviewAnnotation = {
   category: ReviewCategory;
   /** Reviewer explanation shown when hovering the highlight. */
   message?: string;
+  /** How to draw a multi-word match: one continuous box per line
+   * ("phrase", default) or an individual box around every word ("word") —
+   * useful for e.g. flagging each word of an unfinished sentence. */
+  granularity?: "phrase" | "word";
   /** Optional per-annotation style overrides (defaults come from category). */
   color?: string;
   borderColor?: string;

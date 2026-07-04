@@ -212,6 +212,21 @@ function buildEntryRect(
   return viewportRectToScaled(viewportRect, viewport);
 }
 
+/** Splits [start, end) of `text` into the ranges of its individual words. */
+function wordRanges(text: string, start: number, end: number) {
+  const ranges: { start: number; end: number }[] = [];
+  const regex = /\S+/g;
+  let match: RegExpExecArray | null;
+  const slice = text.slice(start, end);
+  while ((match = regex.exec(slice))) {
+    ranges.push({
+      start: start + match.index,
+      end: start + match.index + match[0].length,
+    });
+  }
+  return ranges;
+}
+
 function unionRects(rects: ScaledRect[]): ScaledRect {
   return {
     ...rects[0],
@@ -260,17 +275,29 @@ export async function buildAnnotationHighlights(
         const start = match.index;
         const end = start + match[0].length;
 
-        const rects = entries
-          .filter((entry) => entry.start < end && entry.end > start)
-          .map((entry) =>
-            buildEntryRect(
-              entry,
-              start - entry.start,
-              end - entry.start,
-              viewport,
-              pageNumber,
-              textContent.styles,
-            ),
+        // "word" granularity boxes every word separately; "phrase" (default)
+        // draws one continuous box per underlying text run.
+        const ranges =
+          annotation.granularity === "word"
+            ? wordRanges(pageText, start, end)
+            : [{ start, end }];
+
+        const rects = ranges
+          .flatMap((range) =>
+            entries
+              .filter(
+                (entry) => entry.start < range.end && entry.end > range.start,
+              )
+              .map((entry) =>
+                buildEntryRect(
+                  entry,
+                  range.start - entry.start,
+                  range.end - entry.start,
+                  viewport,
+                  pageNumber,
+                  textContent.styles,
+                ),
+              ),
           )
           .filter((rect): rect is ScaledRect => rect !== null);
 

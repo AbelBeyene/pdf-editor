@@ -28,6 +28,7 @@ type ManualMark = {
   quote: string;
   color: string; // hex, from the color picker
   message: string;
+  wordByWord: boolean;
 };
 
 let markCounter = 0;
@@ -60,6 +61,7 @@ export default function ResumeEditor() {
         quote: mark.quote,
         category: "custom",
         message: mark.message || undefined,
+        granularity: mark.wordByWord ? "word" : "phrase",
         color: hexToRgba(mark.color, 0.5),
         borderColor: hexToRgba(mark.color, 0.9),
       })),
@@ -84,6 +86,7 @@ export default function ResumeEditor() {
         quote: "",
         color: MARK_COLOR_CYCLE[marks.length % MARK_COLOR_CYCLE.length],
         message: "",
+        wordByWord: false,
       },
     ]);
   };
@@ -256,6 +259,25 @@ export default function ResumeEditor() {
                   color: "#475569",
                 }}
               />
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 12,
+                  color: "#475569",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={mark.wordByWord}
+                  onChange={(e) =>
+                    updateMark(mark.id, { wordByWord: e.target.checked })
+                  }
+                />
+                Mark word-by-word
+              </label>
             </div>
           ))}
         </div>
