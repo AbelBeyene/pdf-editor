@@ -174,20 +174,76 @@ export default function ResumeEditor() {
           overflowY: "auto",
         }}
       >
-        <h1 style={{ marginTop: 0 }}>Resume Review</h1>
-        <p style={{ color: "#475569", lineHeight: 1.5 }}>
-          Upload a resume PDF, then add marks below: pick a color, enter the
-          word or sentence to highlight, and optionally a note shown when
-          hovering or clicking the highlight.
-        </p>
+        <div style={{ marginBottom: 4 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "#94a3b8",
+            }}
+          >
+            Resume Editor
+          </div>
+          <h1
+            style={{
+              margin: "2px 0 0",
+              fontSize: 20,
+              fontWeight: 700,
+              color: "#0f172a",
+            }}
+          >
+            Review &amp; Mark
+          </h1>
+        </div>
+
+        <label
+          htmlFor="resume-upload"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            marginTop: 16,
+            width: "100%",
+            boxSizing: "border-box",
+            border: file
+              ? "1px solid rgba(15, 23, 42, 0.15)"
+              : "1px dashed rgba(15, 23, 42, 0.25)",
+            borderRadius: 8,
+            background: file ? "#0f172a" : "transparent",
+            color: file ? "#f8fafc" : "#475569",
+            padding: "10px 12px",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          {file ? file.name : "Choose resume PDF…"}
+        </label>
         <input
+          id="resume-upload"
           type="file"
           accept="application/pdf"
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) setFile(f);
           }}
+          style={{ display: "none" }}
         />
+        <p
+          style={{
+            marginTop: 8,
+            marginBottom: 0,
+            fontSize: 12,
+            lineHeight: 1.5,
+            color: "#94a3b8",
+          }}
+        >
+          Add marks below: pick a color, enter a word or sentence, and
+          optionally a note shown on hover or click.
+        </p>
 
         {selectedAnnotation && (
           <div
@@ -490,14 +546,66 @@ export default function ResumeEditor() {
         </div>
       </aside>
 
-      <main style={{ padding: 16 }}>
-        <PdfReviewViewer
-          file={file}
-          annotations={annotations}
-          selectedAnnotationId={selectedAnnotation?.id ?? null}
-          onAnnotationClick={setSelectedAnnotation}
-          onDocumentLoad={handleDocumentLoad}
-        />
+      <main
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          background: "linear-gradient(180deg, #0b1120 0%, #0f172a 100%)",
+          colorScheme: "dark",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 20px",
+            borderBottom: "1px solid rgba(148, 163, 184, 0.15)",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13,
+              color: "#e2e8f0",
+              overflow: "hidden",
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: file ? "#34d399" : "#475569",
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {file ? file.name : "No document loaded"}
+            </span>
+          </div>
+          <span style={{ fontSize: 11, color: "#64748b", flexShrink: 0 }}>
+            {manualMarks.length} mark{manualMarks.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        <div style={{ flex: 1, padding: 16, minHeight: 0 }}>
+          <PdfReviewViewer
+            file={file}
+            annotations={annotations}
+            selectedAnnotationId={selectedAnnotation?.id ?? null}
+            onAnnotationClick={setSelectedAnnotation}
+            onDocumentLoad={handleDocumentLoad}
+          />
+        </div>
       </main>
     </div>
   );
