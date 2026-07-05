@@ -29,6 +29,9 @@ export type ReviewAnnotation = {
   /** Optional per-annotation style overrides (defaults come from category). */
   color?: string;
   borderColor?: string;
+  /** How to draw the match itself: a filled box ("highlight", default) or
+   * just a bottom border with no fill ("underline"). */
+  displayStyle?: "highlight" | "underline";
 };
 
 export type ReviewResult = {
@@ -46,28 +49,28 @@ export type CategoryStyle = {
 export const CATEGORY_STYLES: Record<ReviewCategory, CategoryStyle> = {
   error: {
     label: "Fix",
-    color: "rgba(255, 92, 92, 0.55)",
-    borderColor: "rgba(183, 28, 28, 0.75)",
+    color: "rgba(255, 92, 92, 0.2)",
+    borderColor: "rgba(183, 28, 28, 0.8)",
   },
   improve: {
     label: "Improve",
-    color: "rgba(255, 200, 60, 0.55)",
-    borderColor: "rgba(181, 136, 0, 0.75)",
+    color: "rgba(255, 170, 40, 0.2)",
+    borderColor: "rgba(181, 106, 0, 0.85)",
   },
   suggestion: {
     label: "Consider",
-    color: "rgba(120, 170, 255, 0.5)",
-    borderColor: "rgba(29, 78, 216, 0.7)",
+    color: "rgba(90, 150, 255, 0.18)",
+    borderColor: "rgba(29, 78, 216, 0.8)",
   },
   good: {
     label: "Strong",
-    color: "rgba(110, 220, 160, 0.5)",
-    borderColor: "rgba(21, 128, 61, 0.7)",
+    color: "rgba(80, 200, 140, 0.18)",
+    borderColor: "rgba(21, 128, 61, 0.8)",
   },
   custom: {
     label: "Marked",
-    color: "rgba(255, 230, 109, 0.6)",
-    borderColor: "rgba(181, 136, 0, 0.65)",
+    color: "rgba(255, 210, 60, 0.22)",
+    borderColor: "rgba(181, 136, 0, 0.8)",
   },
 };
 

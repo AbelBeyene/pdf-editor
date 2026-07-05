@@ -32,6 +32,7 @@ function AnnotationHighlightContainer({
   const { annotation } = highlight;
   const label = CATEGORY_STYLES[annotation.category].label;
   const isSelected = annotation.id === selectedAnnotationId;
+  const isUnderline = annotation.displayStyle === "underline";
 
   const tip = annotation.message ? (
     <div
@@ -72,17 +73,32 @@ function AnnotationHighlightContainer({
         highlight={highlight}
         isScrolledTo={isScrolledTo}
         onClick={() => onAnnotationClick?.(annotation)}
-        style={{
-          background: highlight.color,
-          border: isSelected
-            ? `2px solid ${highlight.borderColor}`
-            : `1px solid ${highlight.borderColor}`,
-          boxShadow: isSelected
-            ? `0 0 0 2px ${highlight.borderColor}`
-            : undefined,
-          borderRadius: 3,
-          cursor: "pointer",
-        }}
+        style={
+          isUnderline
+            ? {
+                // Pending marker: no fill, just an accent underline that
+                // pulses until the user focuses it (mirrors AiMarker).
+                background: isSelected ? highlight.color : "transparent",
+                border: "none",
+                borderBottom: `2px solid ${highlight.borderColor}`,
+                borderRadius: 0,
+                animation: isSelected
+                  ? undefined
+                  : "pulse-border 2s infinite ease-in-out",
+                cursor: "pointer",
+              }
+            : {
+                // Focused suggestion: soft pastel fill + solid accent
+                // underline together, deepening slightly on focus — same
+                // flat, glow-free intensity as the resume-review prototype.
+                background: highlight.color,
+                border: "none",
+                borderBottom: `2px solid ${highlight.borderColor}`,
+                borderRadius: 3,
+                filter: isSelected ? "saturate(1.6)" : undefined,
+                cursor: "pointer",
+              }
+        }
       />
     </MonitoredHighlightContainer>
   );

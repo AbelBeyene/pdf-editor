@@ -30,6 +30,7 @@ type ManualMark = {
   color: string; // hex, from the color picker
   message: string;
   wordByWord: boolean;
+  displayStyle: "highlight" | "underline";
 };
 
 let markCounter = 0;
@@ -122,8 +123,9 @@ export default function ResumeEditor() {
         category: "custom",
         message: mark.message || undefined,
         granularity: mark.wordByWord ? "word" : "phrase",
-        color: hexToRgba(mark.color, 0.5),
-        borderColor: hexToRgba(mark.color, 0.9),
+        color: hexToRgba(mark.color, 0.2),
+        borderColor: hexToRgba(mark.color, 0.85),
+        displayStyle: mark.displayStyle,
       })),
     [manualMarks],
   );
@@ -147,6 +149,7 @@ export default function ResumeEditor() {
         color: MARK_COLOR_CYCLE[marks.length % MARK_COLOR_CYCLE.length],
         message: "",
         wordByWord: false,
+        displayStyle: "highlight",
       },
     ]);
   };
@@ -158,6 +161,8 @@ export default function ResumeEditor() {
         gridTemplateColumns: "320px 1fr",
         minHeight: "100vh",
         background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
+        color: "#0f172a",
+        colorScheme: "light",
       }}
     >
       <aside
@@ -215,12 +220,20 @@ export default function ResumeEditor() {
                 onClick={() => setSelectedAnnotation(null)}
                 aria-label="Dismiss selection"
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 24,
+                  height: 24,
+                  flexShrink: 0,
                   border: "none",
+                  borderRadius: 6,
                   background: "transparent",
                   color: "#94a3b8",
                   cursor: "pointer",
                   fontSize: 16,
                   lineHeight: 1,
+                  padding: 0,
                 }}
               >
                 ×
@@ -294,13 +307,20 @@ export default function ResumeEditor() {
                   onClick={() => removeMark(mark.id)}
                   aria-label={`Remove ${mark.quote || "mark"}`}
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 28,
+                    height: 28,
+                    flexShrink: 0,
                     border: "none",
+                    borderRadius: 6,
                     background: "transparent",
                     color: "#94a3b8",
                     cursor: "pointer",
                     fontSize: 16,
                     lineHeight: 1,
-                    padding: "0 4px",
+                    padding: 0,
                   }}
                 >
                   ×
@@ -338,6 +358,34 @@ export default function ResumeEditor() {
                 />
                 Mark word-by-word
               </label>
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["highlight", "underline"] as const).map((option) => {
+                  const active = mark.displayStyle === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => updateMark(mark.id, { displayStyle: option })}
+                      style={{
+                        flex: 1,
+                        border: active
+                          ? `1px solid ${mark.color}`
+                          : "1px solid rgba(15, 23, 42, 0.12)",
+                        borderRadius: 6,
+                        background: active ? hexToRgba(mark.color, 0.15) : "transparent",
+                        color: active ? "#1e293b" : "#64748b",
+                        padding: "6px 8px",
+                        fontSize: 12,
+                        fontWeight: active ? 600 : 400,
+                        cursor: "pointer",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
@@ -347,11 +395,12 @@ export default function ResumeEditor() {
           style={{
             marginTop: 10,
             width: "100%",
+            boxSizing: "border-box",
             border: "1px dashed rgba(15, 23, 42, 0.2)",
             borderRadius: 8,
             background: "transparent",
             color: "#475569",
-            padding: "6px 8px",
+            padding: "8px 10px",
             cursor: "pointer",
             fontSize: 13,
           }}
@@ -387,42 +436,48 @@ export default function ResumeEditor() {
               fontSize: 13,
             }}
           />
-          <button
-            type="button"
-            onClick={runReplace}
-            disabled={!file || !findText.trim() || replacing}
-            style={{
-              border: "1px solid rgba(15, 23, 42, 0.15)",
-              borderRadius: 8,
-              background: "#0f172a",
-              color: "#f8fafc",
-              padding: "8px 10px",
-              cursor: !file || !findText.trim() || replacing
-                ? "not-allowed"
-                : "pointer",
-              opacity: !file || !findText.trim() || replacing ? 0.5 : 1,
-              fontSize: 13,
-            }}
-          >
-            {replacing ? "Replacing…" : "Replace in PDF"}
-          </button>
-          <button
-            type="button"
-            onClick={downloadPdf}
-            disabled={!file}
-            style={{
-              border: "1px solid rgba(15, 23, 42, 0.2)",
-              borderRadius: 8,
-              background: "transparent",
-              color: "#475569",
-              padding: "6px 8px",
-              cursor: file ? "pointer" : "not-allowed",
-              opacity: file ? 1 : 0.5,
-              fontSize: 13,
-            }}
-          >
-            Download PDF
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              type="button"
+              onClick={runReplace}
+              disabled={!file || !findText.trim() || replacing}
+              style={{
+                flex: 1,
+                boxSizing: "border-box",
+                border: "1px solid rgba(15, 23, 42, 0.15)",
+                borderRadius: 8,
+                background: "#0f172a",
+                color: "#f8fafc",
+                padding: "8px 10px",
+                cursor: !file || !findText.trim() || replacing
+                  ? "not-allowed"
+                  : "pointer",
+                opacity: !file || !findText.trim() || replacing ? 0.5 : 1,
+                fontSize: 13,
+              }}
+            >
+              {replacing ? "Replacing…" : "Replace in PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={downloadPdf}
+              disabled={!file}
+              style={{
+                flex: 1,
+                boxSizing: "border-box",
+                border: "1px solid rgba(15, 23, 42, 0.2)",
+                borderRadius: 8,
+                background: "transparent",
+                color: "#475569",
+                padding: "8px 10px",
+                cursor: file ? "pointer" : "not-allowed",
+                opacity: file ? 1 : 0.5,
+                fontSize: 13,
+              }}
+            >
+              Download PDF
+            </button>
+          </div>
           {replaceStatus && (
             <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>
               {replaceStatus}
